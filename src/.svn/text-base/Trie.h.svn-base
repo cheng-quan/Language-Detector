@@ -1,0 +1,39 @@
+/**
+ * by Zeying Peng, 2011-09-13
+ */
+
+#ifndef _Trie_h_
+#define _Trie_h_
+
+#include <string>
+
+class TrieNode
+{
+public:
+	TrieNode();
+	~TrieNode();
+
+private:
+	TrieNode*		m_pBuffer;
+	unsigned int 	m_iCount;
+
+friend class Trie;
+};
+
+class Trie
+{
+public:
+	Trie();
+	~Trie();
+
+	void 			insert( ::std::string tri_chars );
+	unsigned int 	search( ::std::string tri_chars );
+
+	bool	save( const char* iFileName );
+	bool	load( const char* iFileName );
+private:
+	TrieNode	m_pRoot;
+};
+
+#endif
+

@@ -1,0 +1,62 @@
+/**
+* @file FreqWords.cpp
+* @brief 
+* @author Zeying Peng <zpeng@microstrategy.com>
+* @version 
+* @date 2011-09-20
+*/
+
+#include "FreqWords.h"
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <cctype>
+#include "../UTF8Tokenizer.h"
+
+FreqWords::FreqWords()
+{
+}
+
+FreqWords::~FreqWords()
+{
+}
+
+bool FreqWords::load( const char* iFileName )
+{
+	::std::ifstream file( iFileName );
+	if( !file.good() )
+	{
+		::std::cout << "Failed to open file: " << iFileName << ::std::endl;
+		return false;
+	}
+
+	::std::string line;
+	while( !file.eof() )
+	{
+		getline( file, line );
+		mWords[line] = 1;
+	}
+	return true;
+}
+
+float FreqWords::similarity( const ::std::string& iMessage )
+{
+	if( iMessage.length() == 0 )
+		return 0.0f;
+
+	int common = 0;
+	::std::istringstream iss( iMessage );
+	UTF8Tokenizer tk( iss );
+	UTF8Token token = tk.nextToken();
+	while( token.getType() != TOKEN_EOF )
+	{
+		::std::string tc = token.getContent();
+		if( mWords.find(tc) != mWords.end() )
+			common++;
+		token = tk.nextToken();
+	}
+
+	return (float)common/iMessage.size();
+}
+

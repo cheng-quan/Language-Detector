@@ -1,0 +1,159 @@
+/**
+ * by Zeying Peng, 2011-09-13
+ */
+
+#include "../LanguageDetector.h"
+
+#include <fstream>
+#include <iostream>
+#include <algorithm>
+#include "Trigram.h"
+#include "FreqWords.h"
+#include "TriFreq.h"
+
+const float LanguageDetector::TRIGRAM_SIM_THRESHOLD = 0.3f;
+const float LanguageDetector::FREQWORDS_SIM_THRESHOLD = 0.01f;
+const LANG_ID LanguageDetector::UNKNOWN_LANGID = -1;
+
+LanguageDetector::LanguageDetector() : mGramMap(), mLangMap()
+{
+}
+
+LanguageDetector::~LanguageDetector()
+{
+	::std::map< LANG_ID, Model* >::iterator	it;
+	for( it = mGramMap.begin(); it != mGramMap.end(); it++ )
+	{
+		delete it->second;
+		it->second = NULL;
+	}
+	mGramMap.clear();
+}
+
+bool LanguageDetector::init( const char* iConfigFile )
+{
+	::std::ifstream configFile( iConfigFile );
+	if( !configFile.is_open() )
+	{
+		::std::cout << "Failed to open file: " << iConfigFile << ::std::endl;
+		return false;
+	}
+
+	::std::string	detectModelName;
+	::std::string 	trainTextCorporaDir;
+	::std::string	langName;
+	LANG_ID 		langID;
+	LANG_ID			largestLangID;
+	configFile >> detectModelName;
+	configFile >> trainTextCorporaDir;
+	configFile >> largestLangID;
+	mLangMap[LanguageDetector::UNKNOWN_LANGID] = "Unknown";
+	
+	if( detectModelName.compare( "Trigram" ) == 0 )
+		mModelType = TRIGRAM;
+	else if( detectModelName.compare( "FreqWords" ) == 0 )
+		mModelType = FREQWORDS;
+	else if( detectModelName.compare( "TriFreq" ) == 0 )
+		mModelType = TRIFREQ;
+	else
+	{
+		::std::cout << "Error: unknown detect model type!" << ::std::endl;
+		return false;
+	}
+
+	while( !configFile.eof() )
+	{
+		configFile >> langName >> langID;
+		insertModel( trainTextCorporaDir, langName, langID );
+	}
+	return true;
+}
+
+::std::string LanguageDetector::getLanguageNameByID( LANG_ID iLangID )
+{
+	return mLangMap.find(iLangID)->second;
+}
+
+void LanguageDetector::insertModel( ::std::string iModelDir, ::std::string iLanguageName, LANG_ID iLangID )
+{
+	::std::string langFileName = iModelDir + "/" + iLanguageName;
+	if( mLangMap.find(iLangID) == mLangMap.end() ){
+		mLangMap[iLangID] = iLanguageName;
+		if( mModelType == TRIGRAM )
+		{
+			langFileName += "_trigram";
+			Trigram* ptri = new Trigram();
+			ptri->load( langFileName.c_str() );
+			mGramMap.insert( ::std::pair< LANG_ID, Model* >( iLangID, ptri ) );
+		}
+		else if( mModelType == FREQWORDS )
+		{
+			langFileName += "_freq";
+			FreqWords* pfw = new FreqWords();
+			pfw->load( langFileName.c_str() );
+			mGramMap.insert( ::std::pair< LANG_ID, Model* >( iLangID, pfw ) );
+		}
+		else
+		{
+			size_t i = iModelDir.find('|');
+			::std::string triDir = iModelDir.substr(0, i);
+			::std::string freqDir = iModelDir.substr(i+1);
+			::std::string triLangFileName = iModelDir.substr(0, i) + "/" + iLanguageName + "_trigram";
+			::std::string freqLangFileName = iModelDir.substr(i+1) + "/" + iLanguageName + "_freq";
+			mGramMap.insert( ::std::pair< LANG_ID, Model* >( iLangID, new TriFreq(triLangFileName.c_str(), freqLangFileName.c_str()) ) );
+		}
+	}
+}
+
+bool compareSimPair( ::std::pair< float, LANG_ID > a, ::std::pair< float, LANG_ID > b)
+{
+	return a.first > b.first;
+}
+
+void LanguageDetector::detect( ::std::string iMessage, ::std::vector<LANG_ID>& oLangs, unsigned int iSize )
+{
+	if( oLangs.size() < iSize )
+	{
+		::std::cout << "Error: too small LANG_ID buffer!" << ::std::endl;
+		return;
+	}
+
+	::std::vector< ::std::pair< float, LANG_ID > >	simVector;
+	::std::map< LANG_ID, Model* >::iterator	it;
+
+	for( size_t i = 0; i < iMessage.size(); i++ )
+		iMessage[i] = tolower(iMessage[i]);
+	for( it = mGramMap.begin(); it != mGramMap.end(); it++ )
+	{
+		float sim = it->second->similarity(iMessage);
+		simVector.push_back( ::std::pair< float, LANG_ID >( sim, it->first ) );
+	}
+	stable_sort( simVector.begin(), simVector.end(), compareSimPair );
+	
+	float SIM_THRESHOLD = 0.0f;
+	if( mModelType == TRIGRAM )
+		SIM_THRESHOLD = TRIGRAM_SIM_THRESHOLD;
+	else
+		SIM_THRESHOLD = FREQWORDS_SIM_THRESHOLD;
+
+	for( size_t n = 0; n < simVector.size() && n < iSize; n++ )
+	{
+		if( simVector[n].first < SIM_THRESHOLD )
+			oLangs[n] = UNKNOWN_LANGID;
+		else
+			oLangs[n] = simVector[n].second;
+	}
+}
+
+float LanguageDetector::getTrigramSimilarity( ::std::string iMessage, LANG_ID langid )
+{
+	::std::map< LANG_ID, Model* >::iterator it = mGramMap.find( langid );
+	for( size_t i = 0; i < iMessage.size(); i++ )
+		iMessage[i] = tolower(iMessage[i]);
+	if( it != mGramMap.end() )
+		return it->second->similarity( iMessage );
+	else
+		return 0.0f;
+}
+
+

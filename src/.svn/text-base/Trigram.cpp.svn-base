@@ -1,0 +1,75 @@
+/**
+ * by Zeying Peng, 2011-09-13
+ */
+
+#include "Trigram.h"
+
+#include <iostream>
+#include <fstream>
+
+Trigram::Trigram( ) : m_trie()
+{
+}
+
+Trigram::~Trigram()
+{
+}
+
+bool Trigram::load( const char* iFileName )
+{
+	return m_trie.load( iFileName );
+}
+
+bool Trigram::save( const char* iFileName )
+{
+	return m_trie.save( iFileName );
+}
+
+bool Trigram::train( const char* iTrainFileName, const char* iModelFileName )
+{
+	::std::ifstream file( iTrainFileName );
+	if( !file.good() )
+	{
+		::std::cout << "Failed to open language file: " << iTrainFileName << ::std::endl;
+		return false;
+	}
+
+	Trie te;
+	char buffer[4];
+	for( int i = 0; i < 3; i++ )
+	{
+		buffer[i] = file.get();
+	}
+	buffer[3] = '\0';
+	te.insert( ::std::string(buffer) );
+
+	while( ! file.eof() )
+	{
+		for( int i = 0; i < 2; i++ )
+		{
+			buffer[i] = buffer[i+1];
+		}
+		buffer[2] = file.get();
+		te.insert( ::std::string(buffer) );
+	}
+
+	return te.save( iModelFileName );
+}
+
+float Trigram::similarity( const ::std::string& iMessage )
+{
+	if( iMessage.length() < 3 )
+		return 0.0f;
+
+	int common = 0;
+	for( int i = 0; i < (int)iMessage.length()-2; i++ )
+	{
+		if( m_trie.search( iMessage.substr(i, 3)) != 0 )
+		{
+			common++;
+		}
+	}
+
+	return (float)common/(iMessage.length()-2);
+}
+

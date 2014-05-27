@@ -1,0 +1,39 @@
+//==============================================================================================
+//    FILENAME    :   DetectionController.h
+//    AUTHOR      :   Zeying Peng
+//    CREATION    :   10/09/11
+//    Copyright (C) MicroStrategy Incorporated 2011
+//==============================================================================================
+
+
+#ifndef _DetectionController_h_
+#define _DetectionController_h_
+
+#include <iostream>
+#include <string>
+#include "../LanguageDetector.h"
+#include "TextMining/TMHelper/DatabaseAccessUtility.h"
+#include "TextMining/MsgTagMultilingualDetector/PreLDDetector.h"
+
+class DetectionController
+{
+public:
+	DetectionController();
+	~DetectionController();
+
+	bool initiate();
+	void run();
+
+private:
+	void cleanMessage( ::std::string& msg );
+
+	LanguageDetector	m_trigram_detector;
+	LanguageDetector	m_freqwords_detector;
+
+	DatabaseAccessUtility	m_DBUtility;
+	PreLDDetector			m_prep;
+};
+
+#endif
+
+
